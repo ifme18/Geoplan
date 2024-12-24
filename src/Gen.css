@@ -1,0 +1,209 @@
+.invoice-container {
+    padding: 2rem;
+    max-width: 1200px;
+    margin: 0 auto;
+  }
+  
+  .invoice-card {
+    background: white;
+    border-radius: 8px;
+    padding: 2rem;
+    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+  }
+  
+  .header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 2rem;
+  }
+  
+  .title {
+    font-size: 1.5rem;
+    font-weight: bold;
+    color: #2563eb;
+  }
+  
+  .upload-logo {
+    width: 120px;
+  }
+  
+  .logo-preview {
+    position: relative;
+  }
+  
+  .logo-img {
+    width: 100%;
+    height: auto;
+    border-radius: 4px;
+  }
+  
+  .remove-logo-btn, .remove-signature-btn {
+    position: absolute;
+    top: -8px;
+    right: -8px;
+    background: #ef4444;
+    color: white;
+    border: none;
+    border-radius: 50%;
+    width: 20px;
+    height: 20px;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+  
+  .upload-area {
+    border: 2px dashed #e2e8f0;
+    border-radius: 4px;
+    padding: 1rem;
+    text-align: center;
+    cursor: pointer;
+  }
+  
+  .upload-label {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 0.5rem;
+    color: #64748b;
+    cursor: pointer;
+  }
+  
+  .grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    gap: 1rem;
+    margin-bottom: 1.5rem;
+  }
+  
+  .field {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+  }
+  
+  label {
+    font-size: 0.875rem;
+    font-weight: 500;
+    color: #64748b;
+  }
+  
+  input {
+    padding: 0.5rem;
+    border: 1px solid #e2e8f0;
+    border-radius: 4px;
+    font-size: 0.875rem;
+  }
+  
+  .items-section {
+    margin-bottom: 1.5rem;
+  }
+  
+  .items-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 1rem;
+    font-weight: 500;
+  }
+  
+  .add-item-btn {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    background: #2563eb;
+    color: white;
+    border: none;
+    border-radius: 4px;
+    padding: 0.5rem 1rem;
+    cursor: pointer;
+  }
+  
+  .item-row {
+    display: grid;
+    grid-template-columns: 2fr 1fr 1fr 1fr auto;
+    gap: 1rem;
+    margin-bottom: 0.5rem;
+    align-items: center;
+  }
+  
+  .item-total {
+    text-align: right;
+    font-weight: 500;
+  }
+  
+  .remove-item-btn {
+    background: none;
+    border: none;
+    color: #ef4444;
+    cursor: pointer;
+    padding: 0.25rem;
+  }
+  
+  .summary {
+    margin: 2rem 0;
+    padding: 1rem;
+    background: #f8fafc;
+    border-radius: 4px;
+  }
+  
+  .summary > div {
+    display: flex;
+    justify-content: space-between;
+    margin-bottom: 0.5rem;
+  }
+  
+  .total {
+    font-weight: bold;
+    font-size: 1.125rem;
+    color: #2563eb;
+    border-top: 1px solid #e2e8f0;
+    padding-top: 0.5rem;
+    margin-top: 0.5rem;
+  }
+  
+  .signature-section {
+    margin-bottom: 2rem;
+  }
+  
+  .signature-preview {
+    position: relative;
+    width: 200px;
+  }
+  
+  .signature-img {
+    width: 100%;
+    height: auto;
+    border-radius: 4px;
+  }
+  
+  .hidden {
+    display: none;
+  }
+  
+  .generate-btn {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    background: #2563eb;
+    color: white;
+    border: none;
+    border-radius: 4px;
+    padding: 0.75rem 1.5rem;
+    font-weight: 500;
+    cursor: pointer;
+    margin: 0 auto;
+  }
+  
+  .icon {
+    width: 1rem;
+    height: 1rem;
+  }
+  
+  .upload-icon {
+    width: 1.5rem;
+    height: 1.5rem;
+    color: #64748b;
+  }

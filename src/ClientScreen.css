@@ -1,0 +1,71 @@
+/* ClientList.css */
+.container {
+    padding: 20px;
+    font-family: Arial, sans-serif;
+  }
+  
+  .card {
+    border: 1px solid #ddd;
+    border-radius: 8px;
+    margin-bottom: 20px;
+    padding: 20px;
+    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+  }
+  
+  .card-header {
+    font-size: 1.5em;
+    margin-bottom: 10px;
+  }
+  
+  .client-list {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    gap: 10px;
+  }
+  
+  .client-item {
+    border: 1px solid #ccc;
+    border-radius: 6px;
+    padding: 10px;
+    cursor: pointer;
+    transition: background-color 0.2s ease-in-out;
+  }
+  
+  .client-item:hover {
+    background-color: #f5f5f5;
+  }
+  
+  .stage-update {
+    margin-top: 10px;
+  }
+  
+  .stage-update input {
+    margin: 5px;
+    padding: 5px;
+    width: 100%;
+  }
+  
+  .button-group {
+    margin-top: 20px;
+    display: flex;
+    gap: 10px;
+  }
+  
+  button {
+    padding: 10px 15px;
+    border: none;
+    border-radius: 4px;
+    cursor: pointer;
+  }
+  
+  button.save {
+    background-color: #4caf50;
+    color: white;
+  }
+  
+  button.invoice {
+    background-color: #2196f3;
+    color: white;
+  }
+  
+  

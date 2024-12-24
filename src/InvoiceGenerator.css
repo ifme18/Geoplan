@@ -1,0 +1,147 @@
+.invoice-container {
+    max-width: 1200px;
+    margin: 0 auto;
+    padding: 30px;
+  }
+  
+  .invoice-card {
+    padding: 30px;
+    background-color: #fff;
+    border-radius: 8px;
+    box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+  }
+  
+  .header {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    margin-bottom: 24px;
+  }
+  
+  .title {
+    font-size: 24px;
+    font-weight: bold;
+  }
+  
+  .upload-logo, .upload-area, .signature-section {
+    width: 160px;
+    text-align: center;
+  }
+  
+  .upload-logo img, .signature-preview img {
+    max-width: 100%;
+  }
+  
+  .remove-logo-btn, .remove-signature-btn {
+    background-color: transparent;
+    border: none;
+    font-size: 16px;
+    cursor: pointer;
+    color: red;
+  }
+  
+  .upload-label {
+    cursor: pointer;
+  }
+  
+  .upload-icon {
+    width: 24px;
+    height: 24px;
+  }
+  
+  .grid {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 16px;
+    margin-bottom: 24px;
+  }
+  
+  .field label {
+    display: block;
+    margin-bottom: 8px;
+    font-size: 14px;
+  }
+  
+  .field input {
+    width: 100%;
+    padding: 8px;
+    border: 1px solid #ccc;
+    border-radius: 4px;
+  }
+  
+  .items-section {
+    margin-bottom: 24px;
+  }
+  
+  .items-header {
+    display: flex;
+    justify-content: space-between;
+    margin-bottom: 8px;
+  }
+  
+  .add-item-btn {
+    background-color: #4CAF50;
+    color: white;
+    padding: 6px 12px;
+    border: none;
+    cursor: pointer;
+  }
+  
+  .add-item-btn .icon {
+    width: 14px;
+    height: 14px;
+    margin-right: 8px;
+  }
+  
+  .item-row {
+    display: grid;
+    grid-template-columns: repeat(6, 1fr);
+    gap: 8px;
+    margin-bottom: 8px;
+  }
+  
+  .item-total {
+    text-align: right;
+  }
+  
+  .remove-item-btn {
+    background-color: transparent;
+    border: none;
+    color: red;
+    cursor: pointer;
+  }
+  
+  .summary {
+    border-top: 1px solid #ccc;
+    padding-top: 16px;
+    margin-top: 16px;
+  }
+  
+  .summary div {
+    display: flex;
+    justify-content: space-between;
+    margin-bottom: 8px;
+  }
+  
+  .total {
+    font-weight: bold;
+  }
+  
+  .generate-btn {
+    background-color: #4CAF50;
+    color: white;
+    padding: 12px 20px;
+    width: 100%;
+    text-align: center;
+    cursor: pointer;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+  }
+  
+  .generate-btn .icon {
+    width: 18px;
+    height: 18px;
+    margin-right: 8px;
+  }
+  
