@@ -1,12 +1,13 @@
 import React, { useState, useEffect } from 'react';
 import { db } from './Firebase';
-import { GoogleOAuthProvider, useGoogleLogin } from '@react-oauth/google';
+import { getDocs, collection, addDoc, updateDoc, doc } from 'firebase/firestore'; // Ensure you import necessary Firestore functions
 
 function Appointment() {
   // State for Form Inputs
   const [title, setTitle] = useState('');
   const [notes, setNotes] = useState('');
   const [dateTime, setDateTime] = useState('');
+  const [phone, setPhone] = useState('');
 
   // State for Appointments List
   const [appointments, setAppointments] = useState([]);
@@ -15,7 +16,10 @@ function Appointment() {
   useEffect(() => {
     const fetchAppointments = async () => {
       const querySnapshot = await getDocs(collection(db, 'events'));
-      const data = querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+      const data = querySnapshot.docs.map(doc => ({
+        id: doc.id,
+        ...doc.data(),
+      }));
       setAppointments(data);
     };
 
@@ -24,7 +28,7 @@ function Appointment() {
 
   // Add Appointment to Firestore
   const handleAddAppointment = async () => {
-    if (!title || !notes || !dateTime) {
+    if (!title || !notes || !dateTime || !phone) {
       alert('All fields are required!');
       return;
     }
@@ -33,59 +37,39 @@ function Appointment() {
       await addDoc(collection(db, 'events'), {
         title,
         notes,
-        dateTime,
+        dateTime, // Store the dateTime directly in Firebase format
+        phone,
+        completed: false, // Set completed as false by default
       });
       alert('Appointment added to Firestore!');
       setTitle('');
       setNotes('');
       setDateTime('');
+      setPhone('');
     } catch (e) {
       console.error('Error adding appointment:', e);
     }
   };
 
-  // Google Calendar Integration
-  const googleLogin = useGoogleLogin({
-    scope: 'https://www.googleapis.com/auth/calendar.events',
-    onSuccess: (tokenResponse) => {
-      console.log('Google Login Successful:', tokenResponse);
-      addToGoogleCalendar(tokenResponse.access_token);
-    },
-    onError: (error) => console.error('Login Failed:', error),
-  });
+  // Helper function to convert Firebase Timestamp to a readable date
+  const formatDate = (timestamp) => {
+    if (!timestamp) return ''; // Handle cases where there's no timestamp
 
-  const addToGoogleCalendar = async (accessToken) => {
-    const event = {
-      summary: title,
-      description: notes,
-      start: {
-        dateTime: new Date(dateTime).toISOString(),
-        timeZone: 'UTC',
-      },
-      end: {
-        dateTime: new Date(new Date(dateTime).getTime() + 3600000).toISOString(),
-        timeZone: 'UTC',
-      },
-      reminders: {
-        useDefault: false,
-        overrides: [
-          { method: 'popup', minutes: 30 },
-        ],
-      },
-    };
+    const date = new Date(timestamp.seconds * 1000); // Convert Firebase timestamp to JS Date
+    return date.toLocaleString(); // Return the formatted date string
+  };
 
+  // Handle checkbox change and update completed status in Firestore
+  const handleCheckboxChange = async (id, completed) => {
     try {
-      await fetch('https://www.googleapis.com/calendar/v3/calendars/primary/events', {
-        method: 'POST',
-        headers: {
-          Authorization: `Bearer ${accessToken}`,
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(event),
-      });
-      alert('Event added to Google Calendar!');
-    } catch (error) {
-      console.error('Failed to add event to Google Calendar:', error);
+      const appointmentRef = doc(db, 'events', id);
+      await updateDoc(appointmentRef, { completed: !completed });
+      // Update the local state to reflect the change
+      setAppointments(appointments.map(appointment => 
+        appointment.id === id ? { ...appointment, completed: !completed } : appointment
+      ));
+    } catch (e) {
+      console.error('Error updating appointment:', e);
     }
   };
 
@@ -115,8 +99,14 @@ function Appointment() {
           onChange={(e) => setDateTime(e.target.value)}
           style={styles.input}
         />
+        <input
+          type="text"
+          placeholder="Phone Number"
+          value={phone}
+          onChange={(e) => setPhone(e.target.value)}
+          style={styles.input}
+        />
         <button onClick={handleAddAppointment} style={styles.button}>Add to Firestore</button>
-        <button onClick={googleLogin} style={styles.button}>Add to Google Calendar</button>
       </div>
 
       {/* Appointment List */}
@@ -125,10 +115,23 @@ function Appointment() {
         {appointments.length > 0 ? (
           <ul>
             {appointments.map((appointment) => (
-              <li key={appointment.id} style={styles.listItem}>
+              <li key={appointment.id} style={appointment.completed ? styles.completedItem : styles.notCompletedItem}>
                 <strong>{appointment.title}</strong><br />
                 {appointment.notes} <br />
-                📅 {appointment.dateTime}
+                📅 {formatDate(appointment.dateTime)} <br />
+                📞 {appointment.phone} <br />
+                <label>
+                  <input 
+                    type="checkbox" 
+                    checked={appointment.completed} 
+                    onChange={() => handleCheckboxChange(appointment.id, appointment.completed)} 
+                  />
+                  {appointment.completed ? (
+                    <span style={styles.completed}>Completed</span>
+                  ) : (
+                    <span style={styles.notCompleted}>Not Completed</span>
+                  )}
+                </label>
               </li>
             ))}
           </ul>
@@ -189,6 +192,33 @@ const styles = {
     borderRadius: '4px',
     background: '#fafafa',
   },
+  completed: {
+    color: 'green',
+    fontWeight: 'bold',
+  },
+  notCompleted: {
+    color: 'red',
+    fontWeight: 'bold',
+  },
+  completedItem: {
+    marginBottom: '10px',
+    padding: '10px',
+    border: '1px solid #eee',
+    borderRadius: '4px',
+    background: 'purple', // Color for completed items
+    color: 'white',
+  },
+  notCompletedItem: {
+    marginBottom: '10px',
+    padding: '10px',
+    border: '1px solid #eee',
+    borderRadius: '4px',
+    background: 'lightblue', // Color for not completed items
+    color: 'black',
+  }
 };
 
 export default Appointment;
+
+
+

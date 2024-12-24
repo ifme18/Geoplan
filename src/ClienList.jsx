@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { collection, doc, getDoc, updateDoc } from 'firebase/firestore';
+import { collection, doc, getDoc, getDocs, updateDoc, query, where } from 'firebase/firestore';
 import { db } from './Firebase';
 
 import { jsPDF } from 'jspdf';
@@ -8,6 +8,7 @@ import './ClientScreen.css';
 
 const ClientDetailScreen = ({ clientId }) => {
   const [clientData, setClientData] = useState(null);
+  const [clientTransactions, setClientTransactions] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [isDepositDialogOpen, setIsDepositDialogOpen] = useState(false);
@@ -23,6 +24,14 @@ const ClientDetailScreen = ({ clientId }) => {
 
         if (docSnap.exists()) {
           setClientData(docSnap.data());
+          
+          // Fetch subcollection (e.g., transactions or payment history)
+          const transactionsRef = collection(db, 'clients', clientId, 'transactions');
+          const q = query(transactionsRef, where("status", "==", "completed")); // Example query
+          const querySnapshot = await getDocs(q);
+
+          const transactions = querySnapshot.docs.map(doc => doc.data());
+          setClientTransactions(transactions);
         } else {
           setError('Client not found');
         }
@@ -93,6 +102,12 @@ const ClientDetailScreen = ({ clientId }) => {
     doc.setFontSize(12);
     doc.text(`Name: ${clientData.name}`, 15, 70);
     doc.text(`LR No: ${clientData.lrNo}`, 15, 75);
+
+    // Adding transaction details to the invoice
+    doc.text('Transaction History:', 15, 90);
+    clientTransactions.forEach((transaction, index) => {
+      doc.text(`Transaction ${index + 1}: ${transaction.amount} - ${transaction.date}`, 15, 100 + (index * 10));
+    });
 
     doc.save(`Invoice_${clientData.name}.pdf`);
   };
@@ -179,6 +194,7 @@ const ClientDetailScreen = ({ clientId }) => {
 };
 
 export default ClientDetailScreen;
+
 
 
 
