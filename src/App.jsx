@@ -18,8 +18,7 @@ function App() {
           <nav style={styles.nav}>
             <Link to="/" style={styles.navLink}>Home</Link>
             <Link to="/appointments" style={styles.navLink}>Appointments</Link>
-            <Link to="/invoice" style={styles.navLink}>Client Invoice</Link>
-            <Link to="/Generator" style={styles.navLink}>Client Invoice Generator</Link>
+            <Link to="/Generator" style={styles.navLink}>Client Management</Link>
             <Link to="/Gener" style={styles.navLink}>Client Invoice Generator</Link>
             <Link to="/quotations" style={styles.navLink}>Quotations</Link>
           </nav>
