@@ -12,8 +12,6 @@ import {
   runTransaction
 } from 'firebase/firestore';
 import { db } from './Firebase';
-import { toast, ToastContainer } from 'react-toastify';
-import 'react-toastify/dist/ReactToastify.css';
 import './Invoice.css';
 
 // Helper Functions
@@ -37,6 +35,18 @@ const formatCurrency = (amount) => {
 
 const PAYMENT_STAGES = ['Downpayment', 'CountyApprovals', 'LandApprovals', 'TitlePayments'];
 const PAYMENT_METHODS = ['Cash', 'Bank Transfer', 'Check', 'Mobile Money'];
+
+// Custom Alert Component
+const Alert = ({ message, type, onClose }) => {
+  if (!message) return null;
+
+  return (
+    <div className={`alert alert-${type}`}>
+      {message}
+      <button className="alert-close" onClick={onClose}>×</button>
+    </div>
+  );
+};
 
 // Validation Functions
 const validateClient = (clientData) => {
@@ -80,6 +90,7 @@ const ClientDetailScreen = () => {
   const [showAddClientDialog, setShowAddClientDialog] = useState(false);
   const [showPaymentDialog, setShowPaymentDialog] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
+  const [alert, setAlert] = useState({ message: '', type: '' });
   const [newClientData, setNewClientData] = useState({
     clientName: '',
     lrNo: '',
@@ -95,6 +106,11 @@ const ClientDetailScreen = () => {
     notes: '',
   });
 
+  const showAlert = (message, type = 'error') => {
+    setAlert({ message, type });
+    setTimeout(() => setAlert({ message: '', type: '' }), 5000);
+  };
+
   // Fetch Clients
   useEffect(() => {
     const unsubscribe = onSnapshot(
@@ -108,7 +124,7 @@ const ClientDetailScreen = () => {
       },
       (error) => {
         console.error('Error fetching clients:', error);
-        toast.error('Failed to load clients. Please refresh the page.');
+        showAlert('Failed to load clients. Please refresh the page.');
       }
     );
     return () => unsubscribe();
@@ -135,7 +151,7 @@ const ClientDetailScreen = () => {
       },
       (error) => {
         console.error('Error fetching payment history:', error);
-        toast.error('Failed to load payment history');
+        showAlert('Failed to load payment history');
       }
     );
 
@@ -215,10 +231,10 @@ const ClientDetailScreen = () => {
         TitlePayments: 0,
       });
       setShowAddClientDialog(false);
-      toast.success('Client added successfully!');
+      showAlert('Client added successfully!', 'success');
     } catch (error) {
       console.error('Error adding client:', error);
-      toast.error(error.message || 'Failed to add client. Please try again.');
+      showAlert(error.message || 'Failed to add client. Please try again.');
     } finally {
       setIsLoading(false);
     }
@@ -275,10 +291,10 @@ const ClientDetailScreen = () => {
         notes: '',
       });
       setShowPaymentDialog(false);
-      toast.success('Payment added successfully!');
+      showAlert('Payment added successfully!', 'success');
     } catch (error) {
       console.error('Error adding payment:', error);
-      toast.error(error.message || 'Failed to add payment. Please try again.');
+      showAlert(error.message || 'Failed to add payment. Please try again.');
     } finally {
       setIsLoading(false);
     }
@@ -286,7 +302,11 @@ const ClientDetailScreen = () => {
 
   return (
     <div className="client-detail-container">
-      <ToastContainer position="top-right" autoClose={5000} />
+      <Alert 
+        message={alert.message} 
+        type={alert.type} 
+        onClose={() => setAlert({ message: '', type: '' })} 
+      />
       <h1>Client Management</h1>
 
       <button 
@@ -454,7 +474,8 @@ const ClientDetailScreen = () => {
               const values = selectedClient.paymentStages?.[stage];
               return (
                 <div key={stage} className="stage-details">
-                  <h4>{stage}</h4><div className="payment-info">
+                  <h4>{stage}</h4>
+                  <div className="payment-info">
                     <div className="amount-details">
                       <div>Total Amount: {formatCurrency(values?.total || 0)}</div>
                       <div>Paid Amount: {formatCurrency(values?.paid || 0)}</div>
