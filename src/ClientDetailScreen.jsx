@@ -15,12 +15,6 @@ import { db } from './Firebase';
 import './Invoice.css';
 
 // Helper Functions
-const calculateClientBalance = (paymentStages) => {
-  return Object.values(paymentStages || {}).reduce((total, stage) => {
-    return total + (stage.total || 0) - (stage.paid || 0);
-  }, 0);
-};
-
 const formatDate = (timestamp) => {
   if (!timestamp) return 'N/A';
   return new Date(timestamp.seconds * 1000).toLocaleString();
@@ -30,56 +24,47 @@ const formatCurrency = (amount) => {
   return new Intl.NumberFormat('en-US', {
     style: 'currency',
     currency: 'USD'
-  }).format(amount);
+  }).format(amount || 0);
 };
 
 const PAYMENT_STAGES = ['Downpayment', 'CountyApprovals', 'LandApprovals', 'TitlePayments'];
 const PAYMENT_METHODS = ['Cash', 'Bank Transfer', 'Check', 'Mobile Money'];
 
 // Custom Alert Component
-const Alert = ({ message, type, onClose }) => {
-  if (!message) return null;
-
-  return (
+const Alert = ({ message, type, onClose }) => (
+  message && (
     <div className={`alert alert-${type}`}>
       {message}
       <button className="alert-close" onClick={onClose}>×</button>
     </div>
-  );
-};
+  )
+);
 
 // Validation Functions
 const validateClient = (clientData) => {
-  if (!clientData.clientName?.trim()) {
-    throw new Error('Client name is required');
-  }
-  if (!clientData.lrNo?.trim()) {
-    throw new Error('LR number is required');
-  }
+  if (!clientData.clientName?.trim()) throw new Error('Client name is required');
+  if (!clientData.lrNo?.trim()) throw new Error('LR number is required');
   
-  Object.entries(clientData)
-    .filter(([key]) => key !== 'clientName' && key !== 'lrNo')
-    .forEach(([key, value]) => {
-      if (value < 0) {
-        throw new Error(`${key} amount cannot be negative`);
-      }
-    });
+  Object.entries(clientData).filter(([key]) => key !== 'clientName' && key !== 'lrNo').forEach(([key, value]) => {
+    const numValue = Number(value);
+    if (isNaN(numValue) || numValue < 0) {
+      throw new Error(`${key} amount must be a valid positive number`);
+    }
+  });
 };
 
 const validatePayment = (paymentData, clientData) => {
-  if (!paymentData.stage) {
-    throw new Error('Payment stage is required');
-  }
-  if (!paymentData.amount || paymentData.amount <= 0) {
-    throw new Error('Valid payment amount is required');
-  }
+  if (!clientData) throw new Error('Client data is required');
+  if (!paymentData.stage) throw new Error('Payment stage is required');
+  const amount = Number(paymentData.amount);
+  if (isNaN(amount) || amount <= 0) throw new Error('Valid payment amount is required');
 
-  if (paymentData.stage && clientData?.paymentStages?.[paymentData.stage]) {
-    const stage = clientData.paymentStages[paymentData.stage];
-    const remainingAmount = (stage.total || 0) - (stage.paid || 0);
-    if (paymentData.amount > remainingAmount) {
-      throw new Error(`Payment amount exceeds remaining balance of ${formatCurrency(remainingAmount)}`);
-    }
+  const stage = clientData.paymentStages?.[paymentData.stage];
+  if (!stage) throw new Error('Invalid payment stage');
+
+  const remainingAmount = stage.total - (stage.paid || 0);
+  if (amount > remainingAmount) {
+    throw new Error(`Payment amount exceeds remaining balance of ${formatCurrency(remainingAmount)} for this stage`);
   }
 };
 
@@ -91,19 +76,16 @@ const ClientDetailScreen = () => {
   const [showPaymentDialog, setShowPaymentDialog] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [alert, setAlert] = useState({ message: '', type: '' });
-  const [newClientData, setNewClientData] = useState({
-    clientName: '',
-    lrNo: '',
-    Downpayment: 0,
-    CountyApprovals: 0,
-    LandApprovals: 0,
-    TitlePayments: 0,
+  const [newClientData, setNewClientData] = useState({ 
+    clientName: '', 
+    lrNo: '', 
+    ...Object.fromEntries(PAYMENT_STAGES.map(stage => [stage, '0']))
   });
   const [newPayment, setNewPayment] = useState({
-    stage: '',
-    amount: '',
-    paymentMethod: 'Cash',
-    notes: '',
+    stage: '', 
+    amount: '', 
+    paymentMethod: 'Cash', 
+    notes: ''
   });
 
   const showAlert = (message, type = 'error') => {
@@ -111,51 +93,54 @@ const ClientDetailScreen = () => {
     setTimeout(() => setAlert({ message: '', type: '' }), 5000);
   };
 
-  // Fetch Clients
+  // Fetch Clients in Real-Time
   useEffect(() => {
     const unsubscribe = onSnapshot(
-      collection(db, 'clients'), 
+      query(collection(db, 'clients'), orderBy('createdAt', 'desc')),
       (snapshot) => {
-        const clientsData = snapshot.docs.map((doc) => ({
-          id: doc.id,
-          ...doc.data(),
-        }));
-        setClients(clientsData);
+        setClients(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
       },
-      (error) => {
+      error => {
         console.error('Error fetching clients:', error);
-        showAlert('Failed to load clients. Please refresh the page.');
+        showAlert('Failed to fetch clients due to an error.');
       }
     );
-    return () => unsubscribe();
+
+    return () => unsubscribe(); // Cleanup on component unmount
   }, []);
 
-  // Fetch Payment History
+  // Fetch Payment History for Selected Client in Real-Time
   useEffect(() => {
     if (!selectedClient) return;
-
-    const paymentsQuery = query(
-      collection(db, 'payments'),
-      where('clientId', '==', selectedClient.id),
-      orderBy('timestamp', 'desc')
-    );
-
     const unsubscribe = onSnapshot(
-      paymentsQuery,
+      query(collection(db, 'payments'), where('clientId', '==', selectedClient.id), orderBy('timestamp', 'desc')),
       (snapshot) => {
-        const payments = snapshot.docs.map((doc) => ({
-          id: doc.id,
-          ...doc.data(),
-        }));
-        setPaymentHistory(payments);
+        setPaymentHistory(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
       },
-      (error) => {
+      error => {
         console.error('Error fetching payment history:', error);
-        showAlert('Failed to load payment history');
+        showAlert('Failed to fetch payment history.');
       }
     );
 
-    return () => unsubscribe();
+    // Update selectedClient's payment stages in real-time
+    const clientUnsubscribe = onSnapshot(
+      doc(db, 'clients', selectedClient.id),
+      (doc) => {
+        if (doc.exists()) {
+          setSelectedClient(prev => ({ ...prev, ...doc.data() }));
+        }
+      },
+      error => {
+        console.error('Error updating selected client:', error);
+        showAlert('Failed to update client details.');
+      }
+    );
+
+    return () => {
+      unsubscribe();
+      clientUnsubscribe(); // Cleanup for both listeners on component unmount or when client changes
+    };
   }, [selectedClient]);
 
   const handleFormChange = (e) => {
@@ -172,64 +157,37 @@ const ClientDetailScreen = () => {
     setIsLoading(true);
     try {
       validateClient(newClientData);
+      const paymentStages = PAYMENT_STAGES.reduce((acc, stage) => ({
+        ...acc, 
+        [stage]: { 
+          total: Number(newClientData[stage]) || 0, 
+          paid: 0, 
+          isPaid: false, 
+          lastUpdated: serverTimestamp() 
+        }
+      }), {});
 
-      const paymentStages = {
-        Downpayment: { 
-          total: Number(newClientData.Downpayment) || 0, 
-          paid: 0, 
-          isPaid: false,
-          lastUpdated: serverTimestamp()
-        },
-        CountyApprovals: { 
-          total: Number(newClientData.CountyApprovals) || 0, 
-          paid: 0, 
-          isPaid: false,
-          lastUpdated: serverTimestamp()
-        },
-        LandApprovals: { 
-          total: Number(newClientData.LandApprovals) || 0, 
-          paid: 0, 
-          isPaid: false,
-          lastUpdated: serverTimestamp()
-        },
-        TitlePayments: { 
-          total: Number(newClientData.TitlePayments) || 0, 
-          paid: 0, 
-          isPaid: false,
-          lastUpdated: serverTimestamp()
-        },
-      };
-
-      const pendingBalance = calculateClientBalance(paymentStages);
-
-      const docRef = await addDoc(collection(db, 'clients'), {
-        clientName: newClientData.clientName,
-        lrNo: newClientData.lrNo,
+      const clientRef = await addDoc(collection(db, 'clients'), {
+        ...newClientData,
+        clientName: newClientData.clientName.trim(),
+        lrNo: newClientData.lrNo.trim(),
         paymentStages,
-        pendingBalance,
         createdAt: serverTimestamp(),
         updatedAt: serverTimestamp(),
       });
 
+      console.log('New client added with id:', clientRef.id);
+
       await addDoc(collection(db, 'payments'), {
-        clientId: docRef.id,
-        clientName: newClientData.clientName,
+        clientId: clientRef.id,
+        clientName: newClientData.clientName.trim(),
         stage: 'Initial Setup',
         amount: 0,
         timestamp: serverTimestamp(),
-        remainingBalance: pendingBalance,
-        previousBalance: pendingBalance,
         notes: 'Client account created',
       });
 
-      setNewClientData({
-        clientName: '',
-        lrNo: '',
-        Downpayment: 0,
-        CountyApprovals: 0,
-        LandApprovals: 0,
-        TitlePayments: 0,
-      });
+      setNewClientData({ clientName: '', lrNo: '', ...Object.fromEntries(PAYMENT_STAGES.map(stage => [stage, '0'])) });
       setShowAddClientDialog(false);
       showAlert('Client added successfully!', 'success');
     } catch (error) {
@@ -243,55 +201,53 @@ const ClientDetailScreen = () => {
   const handleAddPayment = async () => {
     setIsLoading(true);
     try {
+      if (!selectedClient) throw new Error('No client selected');
       validatePayment(newPayment, selectedClient);
-      
-      const paymentAmount = Number(newPayment.amount);
-      
+
+      console.log('Attempting to update Firestore with payment:', newPayment);
+
       await runTransaction(db, async (transaction) => {
         const clientRef = doc(db, 'clients', selectedClient.id);
-        
-        const updatedStages = {
-          ...selectedClient.paymentStages,
-          [newPayment.stage]: {
-            ...selectedClient.paymentStages[newPayment.stage],
-            paid: (selectedClient.paymentStages[newPayment.stage]?.paid || 0) + paymentAmount,
-            lastUpdated: serverTimestamp()
-          }
+        const clientSnap = await transaction.get(clientRef);
+        if (!clientSnap.exists()) throw new Error('Client not found');
+
+        const currentClientData = clientSnap.data();
+        const stageData = currentClientData.paymentStages[newPayment.stage];
+        const newPaymentAmount = Number(newPayment.amount);
+        const newPaidAmount = (stageData.paid || 0) + newPaymentAmount;
+
+        const updatedStage = {
+          ...stageData,
+          paid: newPaidAmount,
+          isPaid: newPaidAmount >= stageData.total,
+          lastUpdated: serverTimestamp()
         };
 
-        updatedStages[newPayment.stage].isPaid = 
-          updatedStages[newPayment.stage].paid >= updatedStages[newPayment.stage].total;
-
-        const pendingBalance = calculateClientBalance(updatedStages);
-
-        transaction.update(clientRef, {
-          paymentStages: updatedStages,
-          pendingBalance,
-          updatedAt: serverTimestamp(),
+        // Update only the specific payment stage in Firebase
+        await transaction.update(clientRef, {
+          [`paymentStages.${newPayment.stage}`]: updatedStage,
+          updatedAt: serverTimestamp()
         });
 
+        // Add payment record to 'payments' collection
         const paymentRef = doc(collection(db, 'payments'));
-        transaction.set(paymentRef, {
+        await transaction.set(paymentRef, {
           clientId: selectedClient.id,
-          clientName: selectedClient.clientName,
+          clientName: currentClientData.clientName,
           stage: newPayment.stage,
-          amount: paymentAmount,
+          amount: newPaymentAmount,
           timestamp: serverTimestamp(),
-          remainingBalance: pendingBalance,
-          previousBalance: selectedClient.pendingBalance,
           paymentMethod: newPayment.paymentMethod,
           notes: newPayment.notes,
         });
+
+        console.log('Payment added successfully to Firestore');
       });
 
-      setNewPayment({
-        stage: '',
-        amount: '',
-        paymentMethod: 'Cash',
-        notes: '',
-      });
+      setNewPayment({ stage: '', amount: '', paymentMethod: 'Cash', notes: '' });
       setShowPaymentDialog(false);
       showAlert('Payment added successfully!', 'success');
+      // No need to manually update state here since we have real-time listeners
     } catch (error) {
       console.error('Error adding payment:', error);
       showAlert(error.message || 'Failed to add payment. Please try again.');
@@ -300,18 +256,82 @@ const ClientDetailScreen = () => {
     }
   };
 
+  const renderClientList = () => clients.map(client => (
+    <div 
+      key={client.id} 
+      className={`client-card ${selectedClient?.id === client.id ? 'selected' : ''}`} 
+      onClick={() => setSelectedClient(client)}
+    >
+      <h3>{client.clientName}</h3>
+      <p>LR No: {client.lrNo}</p>
+    </div>
+  ));
+
+  const renderClientDetails = () => {
+    if (!selectedClient) return null;
+    return (
+      <div className="client-details">
+        <h2>{selectedClient.clientName} Details</h2>
+        <p className="client-info">LR No: {selectedClient.lrNo}</p>
+        <button 
+          className="add-payment-button" 
+          onClick={() => setShowPaymentDialog(true)} 
+          disabled={isLoading}
+        >
+          Add New Payment
+        </button>
+        <div className="payment-stages">
+          {PAYMENT_STAGES.map(stage => (
+            <div key={stage} className="stage-details">
+              <h4>{stage}</h4>
+              <div className="payment-info">
+                <div className="amount-details">
+                  <div>Total Amount: {formatCurrency(selectedClient.paymentStages[stage]?.total || 0)}</div>
+                  <div>Paid Amount: {formatCurrency(selectedClient.paymentStages[stage]?.paid || 0)}</div>
+                </div>
+                <div className="payment-status">
+                  <span className={selectedClient.paymentStages[stage]?.isPaid ? 'status-paid' : 'status-pending'}>
+                    {selectedClient.paymentStages[stage]?.isPaid ? '✓ Paid' : `Remaining: ${formatCurrency((selectedClient.paymentStages[stage]?.total || 0) - (selectedClient.paymentStages[stage]?.paid || 0))}`}
+                  </span>
+                  <div className="last-updated">
+                    Last updated: {formatDate(selectedClient.paymentStages[stage]?.lastUpdated)}
+                  </div>
+                </div>
+              </div>
+            </div>
+          ))}
+        </div>
+        <div className="payment-history">
+          <h3>Payment History</h3>
+          {paymentHistory.length === 0 ? (
+            <p className="no-history">No payment history available</p>
+          ) : (
+            paymentHistory.map(payment => (
+              <div key={payment.id} className="history-item">
+                <div className="payment-date">{formatDate(payment.timestamp)}</div>
+                <div className="payment-details">
+                  <span className="payment-stage">{payment.stage}</span>
+                  <span className="payment-amount">{formatCurrency(payment.amount)}</span>
+                </div>
+                <div className="payment-info">
+                  {payment.notes && <div className="payment-notes">{payment.notes}</div>}
+                  {payment.paymentMethod && <div className="payment-method">Payment Method: {payment.paymentMethod}</div>}
+                </div>
+              </div>
+            ))
+          )}
+        </div>
+      </div>
+    );
+  };
+
   return (
     <div className="client-detail-container">
-      <Alert 
-        message={alert.message} 
-        type={alert.type} 
-        onClose={() => setAlert({ message: '', type: '' })} 
-      />
+      <Alert message={alert.message} type={alert.type} onClose={() => setAlert({ message: '', type: '' })} />
       <h1>Client Management</h1>
-
       <button 
-        onClick={() => setShowAddClientDialog(true)}
-        className="add-client-button"
+        onClick={() => setShowAddClientDialog(true)} 
+        className="add-client-button" 
         disabled={isLoading}
       >
         Add New Client
@@ -322,216 +342,101 @@ const ClientDetailScreen = () => {
         <div className="dialog-overlay">
           <div className="dialog">
             <h3>Add New Client</h3>
-            <input
-              type="text"
-              name="clientName"
-              placeholder="Client Name"
-              value={newClientData.clientName}
-              onChange={handleFormChange}
-              required
-              disabled={isLoading}
-            />
-            <input
-              type="text"
-              name="lrNo"
-              placeholder="LR No"
-              value={newClientData.lrNo}
-              onChange={handleFormChange}
-              required
-              disabled={isLoading}
-            />
+            <input type="text" name="clientName" placeholder="Client Name" value={newClientData.clientName} onChange={handleFormChange} required disabled={isLoading} />
+            <input type="text" name="lrNo" placeholder="LR No" value={newClientData.lrNo} onChange={handleFormChange} required disabled={isLoading} />
             <h4>Stage Payments</h4>
-            {PAYMENT_STAGES.map((stage) => (
+            {PAYMENT_STAGES.map(stage => (
               <div key={stage} className="payment-input-group">
                 <label htmlFor={stage}>{stage}</label>
-                <input
-                  id={stage}
-                  type="number"
-                  name={stage}
-                  placeholder={`${stage} Amount`}
-                  value={newClientData[stage]}
-                  onChange={handleFormChange}
-                  min="0"
+                <input 
+                  id={stage} 
+                  type="number" 
+                  name={stage} 
+                  placeholder={`${stage} Amount`} 
+                  value={newClientData[stage]} 
+                  onChange={handleFormChange} 
+                  min="0" 
                   disabled={isLoading}
                 />
               </div>
             ))}
             <div className="dialog-buttons">
-              <button onClick={handleAddClient} disabled={isLoading}>
-                {isLoading ? 'Saving...' : 'Save Client'}
-              </button>
-              <button onClick={() => setShowAddClientDialog(false)} disabled={isLoading}>
-                Cancel
-              </button>
+              <button onClick={handleAddClient} disabled={isLoading}>{isLoading ? 'Saving...' : 'Save Client'}</button>
+              <button onClick={() => setShowAddClientDialog(false)} disabled={isLoading}>Cancel</button>
             </div>
           </div>
         </div>
       )}
 
       {/* Add Payment Dialog */}
-      {showPaymentDialog && selectedClient && (
+      {showPaymentDialog && (
         <div className="dialog-overlay">
           <div className="dialog">
             <h3>Add New Payment</h3>
-            <div className="payment-form">
-              <div className="form-group">
-                <label>Payment Stage:</label>
-                <select
-                  name="stage"
-                  value={newPayment.stage}
-                  onChange={handlePaymentChange}
-                  required
-                  disabled={isLoading}
-                >
-                  <option value="">Select Stage</option>
-                  {PAYMENT_STAGES.map((stage) => (
-                    <option key={stage} value={stage}>{stage}</option>
-                  ))}
-                </select>
-              </div>
-              <div className="form-group">
-                <label>Amount:</label>
-                <input
-                  type="number"
-                  name="amount"
-                  value={newPayment.amount}
-                  onChange={handlePaymentChange}
-                  min="0"
-                  required
-                  disabled={isLoading}
-                />
-              </div>
-              <div className="form-group">
-                <label>Payment Method:</label>
-                <select
-                  name="paymentMethod"
-                  value={newPayment.paymentMethod}
-                  onChange={handlePaymentChange}
-                  disabled={isLoading}
-                >
-                  {PAYMENT_METHODS.map((method) => (
-                    <option key={method} value={method}>{method}</option>
-                  ))}
-                </select>
-              </div>
-              <div className="form-group">
-                <label>Notes:</label>
-                <textarea
-                  name="notes"
-                  value={newPayment.notes}
-                  onChange={handlePaymentChange}
-                  rows="3"
-                  disabled={isLoading}
-                />
-              </div>
+            <div className="form-group">
+              <label>Payment Stage:</label>
+              <select 
+                name="stage" 
+                value={newPayment.stage} 
+                onChange={handlePaymentChange} 
+                required 
+                disabled={isLoading}
+              >
+                <option value="">Select Stage</option>
+                {PAYMENT_STAGES.map(stage => (
+                  <option key={stage} value={stage}>{stage}</option>
+                ))}
+              </select>
+            </div>
+            <div className="form-group">
+              <label>Amount:</label>
+              <input 
+                type="number" 
+                name="amount" 
+                value={newPayment.amount} 
+                onChange={handlePaymentChange} 
+                min="0" 
+                required 
+                disabled={isLoading}
+              />
+            </div>
+            <div className="form-group">
+              <label>Payment Method:</label>
+              <select 
+                name="paymentMethod" 
+                value={newPayment.paymentMethod} 
+                onChange={handlePaymentChange} 
+                disabled={isLoading}
+              >
+                {PAYMENT_METHODS.map(method => (
+                  <option key={method} value={method}>{method}</option>
+                ))}
+              </select>
+            </div>
+            <div className="form-group">
+              <label>Notes:</label>
+              <textarea 
+                name="notes" 
+                value={newPayment.notes} 
+                onChange={handlePaymentChange} 
+                rows="3" 
+                disabled={isLoading}
+              />
             </div>
             <div className="dialog-buttons">
-              <button onClick={handleAddPayment} disabled={isLoading}>
+              <button onClick={handleAddPayment} disabled={isLoading || !newPayment.stage || !newPayment.amount}>
                 {isLoading ? 'Processing...' : 'Add Payment'}
               </button>
-              <button onClick={() => setShowPaymentDialog(false)} disabled={isLoading}>
-                Cancel
-              </button>
+              <button onClick={() => setShowPaymentDialog(false)} disabled={isLoading}>Cancel</button>
             </div>
           </div>
         </div>
       )}
 
-      {/* Client List */}
       <div className="client-list">
-        {clients.map((client) => (
-          <div
-            key={client.id}
-            className={`client-card ${selectedClient?.id === client.id ? 'selected' : ''}`}
-            onClick={() => setSelectedClient(client)}
-          >
-            <h3>{client.clientName}</h3>
-            <p>LR No: {client.lrNo}</p>
-            <p>Pending Balance: {formatCurrency(client.pendingBalance)}</p>
-          </div>
-        ))}
+        {renderClientList()}
       </div>
-
-      {/* Selected Client Details */}
-      {selectedClient && (
-        <div className="client-details">
-          <h2>{selectedClient.clientName} Details</h2>
-          <p className="client-info">LR No: {selectedClient.lrNo}</p>
-          <p className="client-info">
-            Total Balance: {formatCurrency(selectedClient.pendingBalance)}
-          </p>
-          
-          <button 
-            className="add-payment-button"
-            onClick={() => setShowPaymentDialog(true)}
-            disabled={isLoading}
-          >
-            Add New Payment
-          </button>
-          
-          <div className="payment-stages">
-            {PAYMENT_STAGES.map((stage) => {
-              const values = selectedClient.paymentStages?.[stage];
-              return (
-                <div key={stage} className="stage-details">
-                  <h4>{stage}</h4>
-                  <div className="payment-info">
-                    <div className="amount-details">
-                      <div>Total Amount: {formatCurrency(values?.total || 0)}</div>
-                      <div>Paid Amount: {formatCurrency(values?.paid || 0)}</div>
-                    </div>
-                    <div className="payment-status">
-                      <span className={values?.isPaid ? 'status-paid' : 'status-pending'}>
-                        {values?.isPaid ? '✓ Paid' : `Remaining: ${formatCurrency((values?.total || 0) - (values?.paid || 0))}`}
-                      </span>
-                      <div className="last-updated">
-                        Last updated: {formatDate(values?.lastUpdated)}
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-
-          <div className="payment-history">
-            <h3>Payment History</h3>
-            {paymentHistory.length === 0 ? (
-              <p className="no-history">No payment history available</p>
-            ) : (
-              <div className="history-list">
-                {paymentHistory.map((payment) => (
-                  <div key={payment.id} className="history-item">
-                    <div className="payment-date">
-                      {formatDate(payment.timestamp)}
-                    </div>
-                    <div className="payment-details">
-                      <span className="payment-stage">{payment.stage}</span>
-                      <span className="payment-amount">
-                        {formatCurrency(payment.amount)}
-                      </span>
-                    </div>
-                    <div className="payment-info">
-                      <div className="balance-change">
-                        Previous Balance: {formatCurrency(payment.previousBalance)} →{' '}
-                        New Balance: {formatCurrency(payment.remainingBalance)}
-                      </div>
-                      {payment.notes && (
-                        <div className="payment-notes">{payment.notes}</div>
-                      )}
-                      {payment.paymentMethod && (
-                        <div className="payment-method">
-                          Payment Method: {payment.paymentMethod}
-                        </div>
-                      )}
-                    </div>
-                  </div>
-                ))}
-              </div>
-            )}
-          </div>
-        </div>
-      )}
+      {renderClientDetails()}
     </div>
   );
 };
