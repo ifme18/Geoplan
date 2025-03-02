@@ -1,3 +1,5 @@
+
+
 import React, { useState } from 'react';
 import { PlusCircle, MinusCircle, Download, Upload } from 'lucide-react';
 import { jsPDF } from "jspdf";
@@ -162,27 +164,40 @@ const Generation = () => {
     yPosition += 10;
     doc.setFont('helvetica', 'normal');
     doc.text('Subtotal:', summaryX, yPosition);
-    doc.text(`$${calculateSubtotal().toFixed(2)}`, doc.internal.pageSize.width - 25, yPosition, null, null, 'right');
+    doc.text(`kes${calculateSubtotal().toFixed(2)}`, doc.internal.pageSize.width - 25, yPosition, null, null, 'right');
     
     yPosition += 10;
     doc.text(`Tax (${invoice.tax}%):`, summaryX, yPosition);
-    doc.text(`$${(calculateSubtotal() * invoice.tax / 100).toFixed(2)}`, doc.internal.pageSize.width - 25, yPosition, null, null, 'right');
+    doc.text(`kes${(calculateSubtotal() * invoice.tax / 100).toFixed(2)}`, doc.internal.pageSize.width - 25, yPosition, null, null, 'right');
     
     yPosition += 10;
     doc.setFont('helvetica', 'bold');
     doc.setFontSize(12);
     doc.text('Total:', summaryX, yPosition);
-    doc.text(`$${calculateTotal().toFixed(2)}`, doc.internal.pageSize.width - 25, yPosition, null, null, 'right');
+    doc.text(`kes${calculateTotal().toFixed(2)}`, doc.internal.pageSize.width - 25, yPosition, null, null, 'right');
     
     // Add notes section
-    if (invoice.notes) {
-      yPosition += 30;
-      doc.setFontSize(10);
-      doc.setFont('helvetica', 'bold');
-      doc.text('Notes:', 15, yPosition);
-      doc.setFont('helvetica', 'normal');
-      doc.text(invoice.notes, 15, yPosition + 10);
-    }
+    // In your generateInvoicePDF function, replace the notes section with this code:
+// Add notes section
+if (invoice.notes) {
+  yPosition += 30;
+  doc.setFontSize(10);
+  doc.setFont('helvetica', 'bold');
+  doc.text('Notes:', 15, yPosition);
+  
+  // Set font for notes content
+  doc.setFont('helvetica', 'normal');
+  
+  // Split text into multiple lines that fit within page width
+  const maxWidth = doc.internal.pageSize.width - 30; // 15px margin on each side
+  const splitNotes = doc.splitTextToSize(invoice.notes, maxWidth);
+  
+  // Add the wrapped text
+  doc.text(splitNotes, 15, yPosition + 10);
+  
+  // Update yPosition to account for wrapped text
+  yPosition += 10 + (splitNotes.length * 5); // 5 points per line
+}
     
     // Add signature if exists
     if (invoice.signature) {
@@ -194,13 +209,24 @@ const Generation = () => {
     }
     
     // Add footer
-    const footerY = doc.internal.pageSize.height - 20;
-    doc.setFillColor(primaryColor);
-    doc.rect(0, footerY, doc.internal.pageSize.width, 20, 'F');
-    
-    doc.setTextColor(255, 255, 255);
-    doc.setFontSize(8);
-    doc.text('Thank you for your business', doc.internal.pageSize.width / 2, footerY + 12, null, null, 'center');
+    // Replace the current footer code with this updated version
+// Add footer
+const footerY = doc.internal.pageSize.height - 30; // Increased height for more content
+doc.setFillColor(primaryColor);
+doc.rect(0, footerY, doc.internal.pageSize.width, 30, 'F'); // Increased height
+
+// Company details in the footer
+doc.setTextColor(255, 255, 255);
+doc.setFontSize(8);
+doc.setFont('helvetica', 'normal');
+
+// Center align the text
+const centerX = doc.internal.pageSize.width / 2;
+doc.text('Kigio Plaza - Thika 1st floor, No K.1.16', centerX, footerY + 8, {align: 'center'});
+doc.text('P.O Box 522 - 00100 Thika', centerX, footerY + 13, {align: 'center'});
+doc.text('www.geoplankenya.co.ke', centerX, footerY + 18, {align: 'center'});
+doc.text('Registered Land & Engineering Surveyors, Planning & Land Consultants', centerX, footerY + 23, {align: 'center'});
+doc.text('geoplankenya1@gmail.com | info@geoplankenya.co.ke', centerX, footerY + 28, {align: 'center'});
     
     // Download the PDF
     doc.save(`${invoice.invoiceNumber}.pdf`);
@@ -346,21 +372,22 @@ const Generation = () => {
 </div>
 
         </div>
-
         <div className="summary">
-          <div>
-            <span>Subtotal:</span>
-            <span>${calculateSubtotal().toFixed(2)}</span>
-          </div>
-          <div>
-            <span>Tax ({invoice.tax}%):</span>
-            <span>${(calculateSubtotal() * invoice.tax / 100).toFixed(2)}</span>
-          </div>
-          <div className="total">
-            <span>Total:</span>
-            <span>${calculateTotal().toFixed(2)}</span>
-          </div>
-        </div>
+  <div className="summary-row">
+    <span className="summary-label">Subtotal:</span>
+    <span className="summary-value">kes{calculateSubtotal().toFixed(2)}</span>
+  </div>
+  <div className="summary-row">
+    <span className="summary-label">Tax ({invoice.tax}%):</span>
+    <span className="summary-value">kes{(calculateSubtotal() * invoice.tax / 100).toFixed(2)}</span>
+  </div>
+  <div className="summary-row total">
+    <span className="summary-label">Total:</span>
+    <span className="summary-value">kes{calculateTotal().toFixed(2)}</span>
+  </div>
+</div>
+
+        
 
         <div className="signature-section">
           {invoice.signature ? (
@@ -400,5 +427,3 @@ const Generation = () => {
 };
 
 export default Generation;
-
-
