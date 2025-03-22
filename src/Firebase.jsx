@@ -5,13 +5,13 @@ import { getAuth } from "firebase/auth";
 
 // Your web app's Firebase configuration
 const firebaseConfig = {
-    apiKey: "AIzaSyBdj0apmOp6lTlf7sMpBDldFp8WB70iRkg",
-      authDomain: "test-2618d.firebaseapp.com",
-      databaseURL: "https://test-2618d-default-rtdb.firebaseio.com",
-      projectId: "test-2618d",
-      storageBucket: "test-2618d.appspot.com",
-      messagingSenderId: "347431242639",
-      appId: "1:347431242639:web:e2f1ba1f4584fd8bfed9fa"
+  apiKey: "AIzaSyBhdRVei33jeLLTS4vam5IGiWEkwj76GLU",
+  authDomain: "ians-web.firebaseapp.com",
+  projectId: "ians-web",
+  storageBucket: "ians-web.firebasestorage.app",
+  messagingSenderId: "1011416616189",
+  appId: "1:1011416616189:web:473fe9b6cc88dac2be0294",
+  measurementId: "G-B0T6VMRDER"
 };
 
 // Initialize Firebase
