@@ -143,25 +143,174 @@
   }
   
   .summary {
-    margin: 2rem 0;
-    padding: 1rem;
-    background: #f8fafc;
-    border-radius: 4px;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    margin: 20px 0;
+    padding: 15px;
+    border-top: 1px solid #e5e7eb;
   }
   
-  .summary > div {
+  .summary-row {
     display: flex;
     justify-content: space-between;
-    margin-bottom: 0.5rem;
+    width: 100%;
+    flex-wrap: wrap; /* Allow wrapping */
   }
+  
+  .summary-label {
+    font-weight: normal;
+    min-width: 100px;
+    padding-right: 10px;
+    word-break: break-word; /* Allow words to break */
+    max-width: 60%; /* Limit width to prevent overlapping */
+  }
+  
+  .summary-value {
+    font-weight: bold;
+    text-align: right;
+    word-break: break-word; /* Allow words to break */
+    min-width: 80px; /* Ensure minimum space for values */
+  }
+  /* Add these styles to your existing Gen.css file */
+
+/* Action Bar */
+.action-bar {
+  display: flex;
+  gap: 10px;
+  margin-bottom: 20px;
+}
+
+.action-btn {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  padding: 8px 12px;
+  border: none;
+  border-radius: 4px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  color: white;
+}
+
+.new-btn {
+  background-color: #10b981;
+}
+
+.new-btn:hover {
+  background-color: #059669;
+}
+
+.save-btn {
+  background-color: #3b82f6;
+}
+
+.save-btn:hover {
+  background-color: #2563eb;
+}
+
+.load-btn {
+  background-color: #6366f1;
+}
+
+.load-btn:hover {
+  background-color: #4f46e5;
+}
+
+/* Saved Invoices List */
+.saved-invoices-container {
+  background-color: #f9fafb;
+  border-radius: 8px;
+  padding: 15px;
+  margin-bottom: 20px;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+}
+
+.saved-invoices-container h3 {
+  margin-top: 0;
+  margin-bottom: 10px;
+  font-size: 16px;
+  color: #374151;
+}
+
+.saved-invoices-list {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  max-height: 300px;
+  overflow-y: auto;
+}
+
+.saved-invoice-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 10px;
+  margin-bottom: 5px;
+  background-color: white;
+  border-radius: 4px;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05);
+  transition: background-color 0.2s ease;
+}
+
+.saved-invoice-item:hover {
+  background-color: #f3f4f6;
+}
+
+.saved-invoice-item span {
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  padding: 0 5px;
+  font-size: 14px;
+}
+
+.saved-invoice-actions {
+  display: flex;
+  gap: 5px;
+}
+
+.load-invoice-btn, .delete-invoice-btn {
+  padding: 4px 8px;
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 12px;
+  transition: all 0.2s ease;
+}
+
+.load-invoice-btn {
+  background-color: #3b82f6;
+  color: white;
+}
+
+.load-invoice-btn:hover {
+  background-color: #2563eb;
+}
+
+.delete-invoice-btn {
+  background-color: #ef4444;
+  color: white;
+}
+
+.delete-invoice-btn:hover {
+  background-color: #dc2626;
+}
+
+/* Read-only field for invoice number */
+.readonly-field {
+  background-color: #f3f4f6;
+  cursor: not-allowed;
+}
   
   .total {
     font-weight: bold;
-    font-size: 1.125rem;
-    color: #2563eb;
-    border-top: 1px solid #e2e8f0;
-    padding-top: 0.5rem;
-    margin-top: 0.5rem;
+    font-size: 1.1em;
+    margin-top: 10px;
+    padding-top: 10px;
+    border-top: 1px solid #e5e7eb;
   }
   
   .signature-section {
