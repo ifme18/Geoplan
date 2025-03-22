@@ -1,12 +1,14 @@
-
-
 import React, { useState, useEffect } from 'react';
 import { PlusCircle, MinusCircle, Download, Upload, Save, List } from 'lucide-react';
 import { jsPDF } from "jspdf";
+import { getFirestore, collection, addDoc, getDocs, doc, updateDoc, deleteDoc, query, orderBy, where } from 'firebase/firestore';
 import './Gen.css';
 
 const Generation = () => {
-  // Initial state with added lastInvoiceNumber for tracking
+  // Access Firestore from your existing setup
+  const db = getFirestore();
+  
+  // Initial state without storage for logo/signature URLs
   const [invoice, setInvoice] = useState({
     from: '',
     to: '',
@@ -23,6 +25,7 @@ const Generation = () => {
   // State for saved invoices list and UI controls
   const [savedInvoices, setSavedInvoices] = useState([]);
   const [showSavedInvoices, setShowSavedInvoices] = useState(false);
+  const [loading, setLoading] = useState(false);
 
   // Load saved invoices and set next invoice number on component mount
   useEffect(() => {
@@ -31,98 +34,164 @@ const Generation = () => {
   }, []);
 
   // Function to generate the next invoice number
-  const generateNextInvoiceNumber = () => {
-    // Get saved invoices from local storage
-    const savedInvoicesData = JSON.parse(localStorage.getItem('invoices')) || [];
-    
-    if (savedInvoicesData.length === 0) {
-      // Start with LR300 if no invoices exist
-      setInvoice(prev => ({ ...prev, invoiceNumber: 'LR300' }));
-      return;
-    }
-    
-    // Find the highest invoice number
-    const invoiceNumbers = savedInvoicesData.map(inv => {
-      // Extract the numeric part of the invoice number
-      const match = inv.invoiceNumber.match(/LR(\d+)/);
-      return match ? parseInt(match[1]) : 0;
-    });
-    
-    const highestNumber = Math.max(...invoiceNumbers);
-    const nextNumber = highestNumber + 1;
-    
-    // Set the next invoice number
-    setInvoice(prev => ({ ...prev, invoiceNumber: `LR${nextNumber}` }));
-  };
-
-  // Load saved invoices from local storage
-  const loadSavedInvoices = () => {
-    const savedInvoicesData = JSON.parse(localStorage.getItem('invoices')) || [];
-    setSavedInvoices(savedInvoicesData);
-  };
-
-  // Save current invoice to local storage
-  const saveInvoice = () => {
-    // Prepare invoice data for storage (we need to remove non-serializable parts)
-    const invoiceToSave = {
-      ...invoice,
-      // Store only essential info about logo and signature to avoid large storage
-      logo: invoice.logo ? true : null,  // just store a flag that logo exists
-      signature: invoice.signature ? true : null,
-      timestamp: new Date().getTime() // Add timestamp for sorting
-    };
-    
-    // Get current saved invoices
-    const currentSavedInvoices = JSON.parse(localStorage.getItem('invoices')) || [];
-    
-    // Check if invoice with this number already exists and update it, or add new
-    const existingIndex = currentSavedInvoices.findIndex(
-      inv => inv.invoiceNumber === invoice.invoiceNumber
-    );
-    
-    if (existingIndex >= 0) {
-      currentSavedInvoices[existingIndex] = invoiceToSave;
-    } else {
-      currentSavedInvoices.push(invoiceToSave);
-    }
-    
-    // Save to local storage
-    localStorage.setItem('invoices', JSON.stringify(currentSavedInvoices));
-    
-    // Update state
-    setSavedInvoices(currentSavedInvoices);
-    
-    alert('Invoice saved successfully!');
-  };
-  
-  // Load a specific invoice by number
-  const loadInvoice = (invoiceNumber) => {
-    const savedInvoicesData = JSON.parse(localStorage.getItem('invoices')) || [];
-    const invoiceToLoad = savedInvoicesData.find(inv => inv.invoiceNumber === invoiceNumber);
-    
-    if (invoiceToLoad) {
-      // Note: logo and signature data won't be loaded from localStorage
-      // They would need to be re-uploaded by the user
-      setInvoice({
-        ...invoiceToLoad,
-        logo: null, // Reset as we can't store the actual image data efficiently in localStorage
-        signature: null
+  const generateNextInvoiceNumber = async () => {
+    try {
+      // Get saved invoices from Firestore
+      const invoicesRef = collection(db, 'invoices');
+      const querySnapshot = await getDocs(invoicesRef);
+      const savedInvoicesData = querySnapshot.docs.map(doc => ({
+        id: doc.id,
+        ...doc.data()
+      }));
+      
+      if (savedInvoicesData.length === 0) {
+        // Start with LR300 if no invoices exist
+        setInvoice(prev => ({ ...prev, invoiceNumber: 'LR300' }));
+        return;
+      }
+      
+      // Find the highest invoice number
+      const invoiceNumbers = savedInvoicesData.map(inv => {
+        // Extract the numeric part of the invoice number
+        const match = inv.invoiceNumber.match(/LR(\d+)/);
+        return match ? parseInt(match[1]) : 0;
       });
       
-      setShowSavedInvoices(false);
+      const highestNumber = Math.max(...invoiceNumbers);
+      const nextNumber = highestNumber + 1;
+      
+      // Set the next invoice number
+      setInvoice(prev => ({ ...prev, invoiceNumber: `LR${nextNumber}` }));
+    } catch (error) {
+      console.error("Error generating next invoice number: ", error);
+      // Fallback to a default number
+      setInvoice(prev => ({ ...prev, invoiceNumber: 'LR300' }));
+    }
+  };
+
+  // Load saved invoices from Firestore
+  const loadSavedInvoices = async () => {
+    try {
+      setLoading(true);
+      const invoicesRef = collection(db, 'invoices');
+      const q = query(invoicesRef, orderBy('timestamp', 'desc'));
+      const querySnapshot = await getDocs(q);
+      const savedInvoicesData = querySnapshot.docs.map(doc => ({
+        id: doc.id,
+        ...doc.data()
+      }));
+      setSavedInvoices(savedInvoicesData);
+      setLoading(false);
+    } catch (error) {
+      console.error("Error loading invoices: ", error);
+      alert('Error loading invoices: ' + error.message);
+      setLoading(false);
+    }
+  };
+
+  // Save current invoice to Firestore (without logo/signature)
+  const saveInvoice = async () => {
+    try {
+      setLoading(true);
+      
+      // Prepare invoice data for storage (no logo/signature)
+      const invoiceToSave = {
+        from: invoice.from,
+        to: invoice.to,
+        invoiceNumber: invoice.invoiceNumber,
+        date: invoice.date,
+        dueDate: invoice.dueDate,
+        items: invoice.items,
+        tax: invoice.tax,
+        notes: invoice.notes,
+        timestamp: new Date().getTime()
+      };
+      
+      // Check if invoice with this number already exists
+      const invoicesRef = collection(db, 'invoices');
+      const q = query(invoicesRef, where('invoiceNumber', '==', invoice.invoiceNumber));
+      const querySnapshot = await getDocs(q);
+      
+      if (!querySnapshot.empty) {
+        // Update existing invoice
+        const docId = querySnapshot.docs[0].id;
+        await updateDoc(doc(db, 'invoices', docId), invoiceToSave);
+      } else {
+        // Add new invoice
+        await addDoc(collection(db, 'invoices'), invoiceToSave);
+      }
+      
+      // Refresh the saved invoices list
+      loadSavedInvoices();
+      
+      alert('Invoice saved successfully!');
+      setLoading(false);
+    } catch (error) {
+      console.error("Error saving invoice: ", error);
+      alert('Error saving invoice: ' + error.message);
+      setLoading(false);
+    }
+  };
+  
+  // Load a specific invoice
+  const loadInvoice = async (invoiceNumber) => {
+    try {
+      setLoading(true);
+      const invoicesRef = collection(db, 'invoices');
+      const q = query(invoicesRef, where('invoiceNumber', '==', invoiceNumber));
+      const querySnapshot = await getDocs(q);
+      
+      if (!querySnapshot.empty) {
+        const invoiceData = querySnapshot.docs[0].data();
+        
+        // Convert any Firestore timestamps to regular dates if needed
+        const formattedData = {
+          ...invoiceData,
+          date: invoiceData.date || '',
+          dueDate: invoiceData.dueDate || '',
+          // Keep current logo/signature if present (they exist only in current session)
+          logo: invoice.logo,
+          signature: invoice.signature
+        };
+        
+        setInvoice(formattedData);
+        setShowSavedInvoices(false);
+      }
+      
+      setLoading(false);
+    } catch (error) {
+      console.error("Error loading invoice: ", error);
+      alert('Error loading invoice: ' + error.message);
+      setLoading(false);
     }
   };
   
   // Delete a saved invoice
-  const deleteInvoice = (invoiceNumber) => {
-    if (confirm('Are you sure you want to delete this invoice?')) {
-      const currentSavedInvoices = JSON.parse(localStorage.getItem('invoices')) || [];
-      const updatedInvoices = currentSavedInvoices.filter(
-        inv => inv.invoiceNumber !== invoiceNumber
-      );
-      
-      localStorage.setItem('invoices', JSON.stringify(updatedInvoices));
-      setSavedInvoices(updatedInvoices);
+  const deleteInvoice = async (invoiceNumber) => {
+    if (window.confirm('Are you sure you want to delete this invoice?')) {
+      try {
+        setLoading(true);
+        
+        // Find the invoice document
+        const invoicesRef = collection(db, 'invoices');
+        const q = query(invoicesRef, where('invoiceNumber', '==', invoiceNumber));
+        const querySnapshot = await getDocs(q);
+        
+        if (!querySnapshot.empty) {
+          const docId = querySnapshot.docs[0].id;
+          await deleteDoc(doc(db, 'invoices', docId));
+          
+          // Refresh the saved invoices list
+          loadSavedInvoices();
+          alert('Invoice deleted successfully!');
+        }
+        
+        setLoading(false);
+      } catch (error) {
+        console.error("Error deleting invoice: ", error);
+        alert('Error deleting invoice: ' + error.message);
+        setLoading(false);
+      }
     }
   };
 
@@ -195,7 +264,7 @@ const Generation = () => {
     doc.setFillColor(primaryColor);
     doc.rect(0, 0, doc.internal.pageSize.width, 40, 'F');
     
-    // Add Logo if exists
+    // Add Logo if exists (only for current session)
     if (invoice.logo) {
       doc.addImage(invoice.logo, 'JPEG', 15, 10, 30, 30);
     }
@@ -323,7 +392,7 @@ const Generation = () => {
       yPosition += 10 + (splitNotes.length * 5); // 5 points per line
     }
     
-    // Add signature if exists
+    // Add signature if exists (only for current session)
     if (invoice.signature) {
       yPosition += 30;
       doc.addImage(invoice.signature, 'JPEG', 15, yPosition, 40, 20);
@@ -333,9 +402,9 @@ const Generation = () => {
     }
     
     // Add footer
-    const footerY = doc.internal.pageSize.height - 30; // Increased height for more content
+    const footerY = doc.internal.pageSize.height - 30;
     doc.setFillColor(primaryColor);
-    doc.rect(0, footerY, doc.internal.pageSize.width, 30, 'F'); // Increased height
+    doc.rect(0, footerY, doc.internal.pageSize.width, 30, 'F');
 
     // Company details in the footer
     doc.setTextColor(255, 255, 255);
@@ -393,12 +462,13 @@ const Generation = () => {
           <button className="action-btn new-btn" onClick={createNewInvoice}>
             New Invoice
           </button>
-          <button className="action-btn save-btn" onClick={saveInvoice}>
-            <Save className="icon" /> Save Invoice
+          <button className="action-btn save-btn" onClick={saveInvoice} disabled={loading}>
+            <Save className="icon" /> {loading ? 'Saving...' : 'Save Invoice'}
           </button>
           <button 
             className="action-btn load-btn" 
             onClick={() => setShowSavedInvoices(!showSavedInvoices)}
+            disabled={loading}
           >
             <List className="icon" /> {showSavedInvoices ? 'Hide Saved' : 'Show Saved'}
           </button>
@@ -408,34 +478,40 @@ const Generation = () => {
         {showSavedInvoices && (
           <div className="saved-invoices-container">
             <h3>Saved Invoices</h3>
-            {savedInvoices.length === 0 ? (
+            {loading ? (
+              <p>Loading invoices...</p>
+            ) : savedInvoices.length === 0 ? (
               <p>No saved invoices found.</p>
             ) : (
               <ul className="saved-invoices-list">
-                {savedInvoices
-                  .sort((a, b) => b.timestamp - a.timestamp) // Sort by timestamp, newest first
-                  .map(inv => (
-                    <li key={inv.invoiceNumber} className="saved-invoice-item">
-                      <span>{inv.invoiceNumber}</span>
-                      <span>{inv.to}</span>
-                      <span>{inv.date}</span>
-                      <span>kes{calculateTotal().toFixed(2)}</span>
-                      <div className="saved-invoice-actions">
-                        <button 
-                          className="load-invoice-btn" 
-                          onClick={() => loadInvoice(inv.invoiceNumber)}
-                        >
-                          Load
-                        </button>
-                        <button 
-                          className="delete-invoice-btn" 
-                          onClick={() => deleteInvoice(inv.invoiceNumber)}
-                        >
-                          Delete
-                        </button>
-                      </div>
-                    </li>
-                  ))}
+                {savedInvoices.map(inv => (
+                  <li key={inv.invoiceNumber} className="saved-invoice-item">
+                    <span>{inv.invoiceNumber}</span>
+                    <span>{inv.to}</span>
+                    <span>{inv.date}</span>
+                    <span>
+                      kes{inv.items ? inv.items.reduce(
+                        (sum, item) => sum + (item.quantity * item.rate), 0
+                      ).toFixed(2) : '0.00'}
+                    </span>
+                    <div className="saved-invoice-actions">
+                      <button 
+                        className="load-invoice-btn" 
+                        onClick={() => loadInvoice(inv.invoiceNumber)}
+                        disabled={loading}
+                      >
+                        Load
+                      </button>
+                      <button 
+                        className="delete-invoice-btn" 
+                        onClick={() => deleteInvoice(inv.invoiceNumber)}
+                        disabled={loading}
+                      >
+                        Delete
+                      </button>
+                    </div>
+                  </li>
+                ))}
               </ul>
             )}
           </div>
@@ -511,13 +587,13 @@ const Generation = () => {
                 type="number"
                 placeholder="Quantity"
                 value={item.quantity}
-                onChange={e => updateItem(index, 'quantity', parseFloat(e.target.value))}
+                onChange={e => updateItem(index, 'quantity', parseFloat(e.target.value) || 0)}
               />
               <input
                 type="number"
                 placeholder="Rate"
                 value={item.rate}
-                onChange={e => updateItem(index, 'rate', parseFloat(e.target.value))}
+                onChange={e => updateItem(index, 'rate', parseFloat(e.target.value) || 0)}
               />
               <div className="item-total">kes{(item.quantity * item.rate).toFixed(2)}</div>
               <button className="remove-item-btn" onClick={() => removeItem(index)}>
@@ -591,7 +667,7 @@ const Generation = () => {
           )}
         </div>
 
-        <button className="generate-btn" onClick={generateInvoicePDF}>
+        <button className="generate-btn" onClick={generateInvoicePDF} disabled={loading}>
           <Download className="icon" />
           Generate Invoice
         </button>
