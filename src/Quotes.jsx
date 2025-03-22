@@ -1,7 +1,7 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import './Quotation.css';
-import { jsPDF } from 'jspdf';  // To generate a PDF document
-import { useRef } from 'react';  // To reference file input elements
+import { jsPDF } from 'jspdf';
+import { useRef } from 'react';
 
 export default function QuotationScreen() {
   const [recipient, setRecipient] = useState('');
@@ -15,12 +15,24 @@ export default function QuotationScreen() {
     vatAmount: 0,
     totalAmountWithVat: 0
   });
-  const [logo, setLogo] = useState(null);  // For logo upload
-  const [signature, setSignature] = useState(null);  // For digital signature upload
+  const [logo, setLogo] = useState(null);
+  const [signature, setSignature] = useState(null);
+  const [quotationName, setQuotationName] = useState('');
+  const [savedQuotations, setSavedQuotations] = useState([]);
+  const [showSaveModal, setShowSaveModal] = useState(false);
+  const [showLoadModal, setShowLoadModal] = useState(false);
   
   // References for file uploads
   const logoRef = useRef();
   const signatureRef = useRef();
+
+  // Load saved quotations from localStorage on component mount
+  useEffect(() => {
+    const savedData = localStorage.getItem('savedQuotations');
+    if (savedData) {
+      setSavedQuotations(JSON.parse(savedData));
+    }
+  }, []);
 
   const updateAmount = (index, updatedItem) => {
     const newItems = [...items];
@@ -41,6 +53,13 @@ export default function QuotationScreen() {
 
   const addNewItem = () => {
     setItems([...items, { item: '', description: '', quantity: 1, unitCost: 0, amount: 0 }]);
+  };
+
+  const removeItem = (index) => {
+    const newItems = [...items];
+    newItems.splice(index, 1);
+    setItems(newItems);
+    calculateTotalAmount(newItems);
   };
 
   const handleGeneratePDF = () => {
@@ -188,6 +207,97 @@ export default function QuotationScreen() {
     doc.save('quotation.pdf');
   };
 
+  // Save quotation to localStorage
+  const saveQuotation = () => {
+    if (!quotationName.trim()) {
+      alert("Please enter a name for this quotation");
+      return;
+    }
+
+    // Prepare logo and signature as base64 if they exist
+    const prepareImageData = async () => {
+      let logoData = null;
+      let signatureData = null;
+
+      if (logo) {
+        logoData = await fileToBase64(logo);
+      }
+      if (signature) {
+        signatureData = await fileToBase64(signature);
+      }
+
+      const quotationData = {
+        id: Date.now().toString(),
+        name: quotationName,
+        recipient,
+        signatory,
+        paymentTerms,
+        items,
+        totals,
+        logo: logoData,
+        signature: signatureData,
+        date: new Date().toISOString()
+      };
+
+      const updatedQuotations = [...savedQuotations, quotationData];
+      setSavedQuotations(updatedQuotations);
+      localStorage.setItem('savedQuotations', JSON.stringify(updatedQuotations));
+      
+      setShowSaveModal(false);
+      setQuotationName('');
+      alert("Quotation saved successfully!");
+    };
+
+    prepareImageData();
+  };
+
+  // Helper function to convert File to base64
+  const fileToBase64 = (file) => {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.readAsDataURL(file);
+      reader.onload = () => resolve(reader.result);
+      reader.onerror = error => reject(error);
+    });
+  };
+
+  // Load a saved quotation
+  const loadQuotation = async (quotation) => {
+    setRecipient(quotation.recipient);
+    setSignatory(quotation.signatory);
+    setPaymentTerms(quotation.paymentTerms);
+    setItems(quotation.items);
+    setTotals(quotation.totals);
+
+    // Convert base64 back to File objects if they exist
+    if (quotation.logo) {
+      const logoFile = await base64toFile(quotation.logo, 'logo.png', 'image/png');
+      setLogo(logoFile);
+    }
+    if (quotation.signature) {
+      const signatureFile = await base64toFile(quotation.signature, 'signature.png', 'image/png');
+      setSignature(signatureFile);
+    }
+
+    setShowLoadModal(false);
+  };
+
+  // Helper function to convert base64 to File
+  const base64toFile = async (dataUrl, filename, mimeType) => {
+    const res = await fetch(dataUrl);
+    const blob = await res.blob();
+    return new File([blob], filename, { type: mimeType });
+  };
+
+  // Delete a saved quotation
+  const deleteQuotation = (id) => {
+    if (window.confirm("Are you sure you want to delete this quotation?")) {
+      const updatedQuotations = savedQuotations.filter(q => q.id !== id);
+      setSavedQuotations(updatedQuotations);
+      localStorage.setItem('savedQuotations', JSON.stringify(updatedQuotations));
+    }
+  };
+
   // Handle file uploads
   const handleLogoUpload = (e) => {
     setLogo(e.target.files[0]);
@@ -201,6 +311,10 @@ export default function QuotationScreen() {
     <div className="quotation-screen">
       <div className="header">
         <h1>Create Quotation</h1>
+        <div className="header-buttons">
+          <button onClick={() => setShowSaveModal(true)} className="btn secondary-btn">Save Quotation</button>
+          <button onClick={() => setShowLoadModal(true)} className="btn secondary-btn">Load Quotation</button>
+        </div>
       </div>
       
       <div className="card">
@@ -208,36 +322,55 @@ export default function QuotationScreen() {
           <h2>Quotation Details</h2>
         </div>
         <div className="card-content">
-          <input
-            type="text"
-            value={recipient}
-            onChange={(e) => setRecipient(e.target.value)}
-            placeholder="Recipient Name"
-            className="input-field"
-          />
+          <div className="form-row">
+            <div className="form-group">
+              <label>Recipient Name</label>
+              <input
+                type="text"
+                value={recipient}
+                onChange={(e) => setRecipient(e.target.value)}
+                placeholder="Recipient Name"
+                className="input-field"
+              />
+            </div>
+            
+            <div className="form-group">
+              <label>Payment Terms</label>
+              <input
+                type="text"
+                value={paymentTerms}
+                onChange={(e) => setPaymentTerms(e.target.value)}
+                placeholder="Payment Terms"
+                className="input-field"
+              />
+            </div>
+          </div>
           
-          <input
-            type="text"
-            value={paymentTerms}
-            onChange={(e) => setPaymentTerms(e.target.value)}
-            placeholder="Payment Terms"
-            className="input-field"
-          />
-          
-          <input
-            type="file"
-            accept="image/*"
-            ref={logoRef}
-            onChange={handleLogoUpload}
-            className="file-input"
-          />
-          <input
-            type="file"
-            accept="image/*"
-            ref={signatureRef}
-            onChange={handleSignatureUpload}
-            className="file-input"
-          />
+          <div className="form-row">
+            <div className="form-group">
+              <label>Company Logo</label>
+              <input
+                type="file"
+                accept="image/*"
+                ref={logoRef}
+                onChange={handleLogoUpload}
+                className="file-input"
+              />
+              {logo && <div className="preview-image">{logo.name}</div>}
+            </div>
+            
+            <div className="form-group">
+              <label>Signature</label>
+              <input
+                type="file"
+                accept="image/*"
+                ref={signatureRef}
+                onChange={handleSignatureUpload}
+                className="file-input"
+              />
+              {signature && <div className="preview-image">{signature.name}</div>}
+            </div>
+          </div>
 
           <div className="table-container">
             <table>
@@ -248,6 +381,7 @@ export default function QuotationScreen() {
                   <th>Quantity</th>
                   <th>Unit Cost (Ksh)</th>
                   <th>Amount (Ksh)</th>
+                  <th>Action</th>
                 </tr>
               </thead>
               <tbody>
@@ -275,6 +409,7 @@ export default function QuotationScreen() {
                         value={item.quantity}
                         onChange={(e) => updateAmount(index, { ...item, quantity: Number(e.target.value) })}
                         className="input-field"
+                        min="1"
                       />
                     </td>
                     <td>
@@ -283,10 +418,22 @@ export default function QuotationScreen() {
                         value={item.unitCost}
                         onChange={(e) => updateAmount(index, { ...item, unitCost: Number(e.target.value) })}
                         className="input-field"
+                        min="0"
+                        step="0.01"
                       />
                     </td>
                     <td className="text-right">
                       {item.amount.toFixed(2)}
+                    </td>
+                    <td>
+                      {items.length > 1 && (
+                        <button 
+                          onClick={() => removeItem(index)} 
+                          className="btn delete-btn"
+                        >
+                          Remove
+                        </button>
+                      )}
                     </td>
                   </tr>
                 ))}
@@ -304,13 +451,16 @@ export default function QuotationScreen() {
             Add New Item
           </button>
 
-          <input
-            type="text"
-            value={signatory}
-            onChange={(e) => setSignatory(e.target.value)}
-            placeholder="Signatory Name"
-            className="input-field"
-          />
+          <div className="form-group">
+            <label>Signatory Name</label>
+            <input
+              type="text"
+              value={signatory}
+              onChange={(e) => setSignatory(e.target.value)}
+              placeholder="Signatory Name"
+              className="input-field"
+            />
+          </div>
 
           <div className="button-group">
             <button onClick={handleGeneratePDF} className="btn primary-btn">Download Quotation</button>
@@ -318,8 +468,72 @@ export default function QuotationScreen() {
           </div>
         </div>
       </div>
+
+      {/* Save Modal */}
+      {showSaveModal && (
+        <div className="modal">
+          <div className="modal-content">
+            <div className="modal-header">
+              <h2>Save Quotation</h2>
+              <span className="close" onClick={() => setShowSaveModal(false)}>&times;</span>
+            </div>
+            <div className="modal-body">
+              <div className="form-group">
+                <label>Quotation Name</label>
+                <input
+                  type="text"
+                  value={quotationName}
+                  onChange={(e) => setQuotationName(e.target.value)}
+                  placeholder="Enter a name for this quotation"
+                  className="input-field"
+                />
+              </div>
+            </div>
+            <div className="modal-footer">
+              <button onClick={() => setShowSaveModal(false)} className="btn secondary-btn">Cancel</button>
+              <button onClick={saveQuotation} className="btn primary-btn">Save</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Load Modal */}
+      {showLoadModal && (
+        <div className="modal">
+          <div className="modal-content">
+            <div className="modal-header">
+              <h2>Load Quotation</h2>
+              <span className="close" onClick={() => setShowLoadModal(false)}>&times;</span>
+            </div>
+            <div className="modal-body">
+              {savedQuotations.length === 0 ? (
+                <p>No saved quotations found.</p>
+              ) : (
+                <div className="saved-quotations">
+                  {savedQuotations.map((quote) => (
+                    <div key={quote.id} className="saved-quotation-item">
+                      <div className="quotation-details">
+                        <h3>{quote.name}</h3>
+                        <p>Recipient: {quote.recipient}</p>
+                        <p>Date: {new Date(quote.date).toLocaleDateString()}</p>
+                        <p>Total: Ksh {quote.totals.totalAmountWithVat.toFixed(2)}</p>
+                      </div>
+                      <div className="quotation-actions">
+                        <button onClick={() => loadQuotation(quote)} className="btn primary-btn">Load</button>
+                        <button onClick={() => deleteQuotation(quote.id)} className="btn delete-btn">Delete</button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+            <div className="modal-footer">
+              <button onClick={() => setShowLoadModal(false)} className="btn secondary-btn">Cancel</button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
-
 
